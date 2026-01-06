@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import * as poseDetection from '@tensorflow-models/pose-detection';
+import * as tf from '@tensorflow/tfjs-core';
 import '@tensorflow/tfjs-backend-webgl';
 
 export default function ProductDetail() {
@@ -29,12 +30,18 @@ export default function ProductDetail() {
 
   useEffect(() => {
     const initDetector = async () => {
-      const model = poseDetection.SupportedModels.MoveNet;
-      const detectorConfig = {
-        modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-      };
-      const newDetector = await poseDetection.createDetector(model, detectorConfig);
-      setDetector(newDetector);
+      try {
+        await tf.setBackend('webgl');
+        await tf.ready();
+        const model = poseDetection.SupportedModels.MoveNet;
+        const detectorConfig = {
+          modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+        };
+        const newDetector = await poseDetection.createDetector(model, detectorConfig);
+        setDetector(newDetector);
+      } catch (error) {
+        console.error("Failed to initialize pose detector:", error);
+      }
     };
     initDetector();
   }, []);
