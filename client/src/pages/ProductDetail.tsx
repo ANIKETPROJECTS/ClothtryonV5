@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -20,6 +21,7 @@ export default function ProductDetail() {
   const [activeImage, setActiveImage] = useState(0);
   const [isImageVTOProcessing, setIsImageVTOProcessing] = useState(false);
   const [vtoResultImage, setVtoResultImage] = useState<string | null>(null);
+  const [showResultDialog, setShowResultDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: fetchedProduct } = useProduct(Number(id));
@@ -72,6 +74,7 @@ export default function ProductDetail() {
         
         if (data.status === "success") {
           setVtoResultImage(data.resultImage);
+          setShowResultDialog(true);
           toast({
             title: "Success",
             description: "Try-on image generated successfully!",
@@ -113,6 +116,43 @@ export default function ProductDetail() {
           />
         )}
       </AnimatePresence>
+
+      <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
+        <DialogContent className="max-w-2xl bg-zinc-950 border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Your Try-On Result</DialogTitle>
+          </DialogHeader>
+          <div className="aspect-[3/4] rounded-lg overflow-hidden bg-white mt-4">
+            {vtoResultImage && (
+              <img 
+                src={vtoResultImage} 
+                alt="Try-on result" 
+                className="w-full h-full object-cover"
+              />
+            )}
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button 
+              variant="outline" 
+              className="border-zinc-800 text-white hover:bg-zinc-900"
+              onClick={() => setShowResultDialog(false)}
+            >
+              Close
+            </Button>
+            <Button 
+              className="bg-primary text-black hover:bg-primary/90"
+              onClick={() => {
+                const link = document.createElement('a');
+                link.href = vtoResultImage || '';
+                link.download = `try-on-${product.name}.png`;
+                link.click();
+              }}
+            >
+              Download Image
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="pt-24 pb-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 xl:gap-24">
