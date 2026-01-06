@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingBag, Star, Share2, Heart, Scan, Check, Upload, Loader2, Image as ImageIcon } from "lucide-react";
@@ -12,8 +12,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import * as poseDetection from '@tensorflow-models/pose-detection';
-import '@tensorflow/tfjs-backend-webgl';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -24,20 +22,7 @@ export default function ProductDetail() {
   const [isImageVTOProcessing, setIsImageVTOProcessing] = useState(false);
   const [vtoResultImage, setVtoResultImage] = useState<string | null>(null);
   const [showResultDialog, setShowResultDialog] = useState(false);
-  const [detector, setDetector] = useState<poseDetection.PoseDetector | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const initDetector = async () => {
-      const model = poseDetection.SupportedModels.MoveNet;
-      const detectorConfig = {
-        modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-      };
-      const newDetector = await poseDetection.createDetector(model, detectorConfig);
-      setDetector(newDetector);
-    };
-    initDetector();
-  }, []);
 
   const { data: fetchedProduct } = useProduct(Number(id));
   const { data: allProducts } = useProducts();
@@ -81,30 +66,30 @@ export default function ProductDetail() {
       setIsImageVTOProcessing(true);
       
       try {
-        const personImg = new Image();
-        personImg.src = personImage;
-        await new Promise((resolve) => (personImg.onload = resolve));
+        const res = await apiRequest("POST", "/api/vto/image-try-on", {
+          personImage,
+          clothingImage: images[0]
+        });
+        const data = await res.json();
+        
+        if (data.status === "success") {
+          // Instead of AI generation, we use a canvas-based composite to preserve identity
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
 
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+          const personImg = new Image();
+          const clothImg = new Image();
 
-        canvas.width = personImg.width;
-        canvas.height = personImg.height;
-        ctx.drawImage(personImg, 0, 0);
-
-        if (detector) {
-          const poses = await detector.estimatePoses(personImg);
-          if (poses && poses.length > 0) {
-            const pose = poses[0];
-            const leftShoulder = pose.keypoints.find(kp => kp.name === 'left_shoulder');
-            const rightShoulder = pose.keypoints.find(kp => kp.name === 'right_shoulder');
-
-            if (leftShoulder && rightShoulder && leftShoulder.score! > 0.3 && rightShoulder.score! > 0.3) {
-              const clothImg = new Image();
-              clothImg.src = images[0];
-              await new Promise((resolve) => (clothImg.onload = resolve));
-
+          personImg.onload = () => {
+            canvas.width = personImg.width;
+            canvas.height = personImg.height;
+            
+            // Draw person
+            ctx.drawImage(personImg, 0, 0);
+            
+            clothImg.onload = () => {
+              // Create a temporary canvas to remove white background
               const tempCanvas = document.createElement('canvas');
               const tempCtx = tempCanvas.getContext('2d');
               if (!tempCtx) return;
@@ -116,57 +101,54 @@ export default function ProductDetail() {
               const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
               const data = imageData.data;
 
+              // Simple white removal (threshold-based)
               for (let i = 0; i < data.length; i += 4) {
-                const r = data[i], g = data[i+1], b = data[i+2];
-                const brightness = (r + g + b) / 3;
-                const diff = Math.max(Math.abs(r - g), Math.abs(g - b), Math.abs(b - r));
-                if (brightness > 230 && diff < 15) {
-                  const alpha = Math.max(0, (255 - brightness) / (255 - 230) * 255);
-                  data[i + 3] = Math.min(data[i + 3], alpha);
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                // If pixel is very close to white, make it transparent
+                if (r > 240 && g > 240 && b > 240) {
+                  data[i + 3] = 0;
                 }
               }
               tempCtx.putImageData(imageData, 0, 0);
 
-              const shoulderWidth = Math.sqrt(
-                Math.pow(leftShoulder.x - rightShoulder.x, 2) + 
-                Math.pow(leftShoulder.y - rightShoulder.y, 2)
-              );
-              
-              // Refined garment scaling: shoulders usually take up about 45-50% of the shirt width
-              const clothWidth = shoulderWidth * 2.1;
-              const clothHeight = (clothImg.height / clothImg.width) * clothWidth;
-              const centerX = (leftShoulder.x + rightShoulder.x) / 2;
-              const centerY = (leftShoulder.y + rightShoulder.y) / 2;
-              
-              // Vertical adjustment: place the collar slightly below the neck midpoint
-              const x = centerX - (clothWidth / 2);
-              const y = centerY - (clothHeight * 0.12);
+              // Non-AI mapping logic using TSHIRT_CONFIG calibration
+              const scaleFactor = TSHIRT_CONFIG.calibration?.scaleFactor || 0.5;
+              const verticalOffset = TSHIRT_CONFIG.calibration?.verticalOffset || 0.25;
 
+              const clothWidth = canvas.width * scaleFactor;
+              const clothHeight = (clothImg.height / clothImg.width) * clothWidth;
+              const x = (canvas.width - clothWidth) / 2;
+              const y = canvas.height * verticalOffset;
+
+              // Draw processed cloth
               ctx.drawImage(tempCanvas, x, y, clothWidth, clothHeight);
               
               const resultImage = canvas.toDataURL('image/png');
               setVtoResultImage(resultImage);
               setShowResultDialog(true);
-              toast({ title: "Success", description: "Clothing mapped accurately using pose detection!" });
-              setIsImageVTOProcessing(false);
-              return;
-            }
-          }
+              toast({
+                title: "Success",
+                description: "Clothing mapped successfully!",
+              });
+            };
+            clothImg.src = images[0];
+          };
+          personImg.src = personImage;
+        } else {
+          toast({
+            title: "Error",
+            description: data.message || "Failed to process image.",
+            variant: "destructive",
+          });
         }
-        
-        // Fallback to basic mapping if pose detection fails
-        const clothImg = new Image();
-        clothImg.src = images[0];
-        await new Promise((resolve) => (clothImg.onload = resolve));
-        const clothWidth = canvas.width * 0.5;
-        const clothHeight = (clothImg.height / clothImg.width) * clothWidth;
-        ctx.drawImage(clothImg, (canvas.width - clothWidth) / 2, canvas.height * 0.25, clothWidth, clothHeight);
-        setVtoResultImage(canvas.toDataURL('image/png'));
-        setShowResultDialog(true);
-        toast({ title: "Note", description: "Body not detected, using basic alignment." });
-
       } catch (error) {
-        toast({ title: "Error", description: "Failed to process image try-on.", variant: "destructive" });
+        toast({
+          title: "Error",
+          description: "Failed to process image try-on.",
+          variant: "destructive",
+        });
       } finally {
         setIsImageVTOProcessing(false);
       }
