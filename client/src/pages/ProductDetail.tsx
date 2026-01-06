@@ -73,23 +73,55 @@ export default function ProductDetail() {
         const data = await res.json();
         
         if (data.status === "success") {
-          setVtoResultImage(data.resultImage);
-          setShowResultDialog(true);
-          toast({
-            title: "Success",
-            description: "Try-on image generated successfully!",
-          });
+          // Instead of AI generation, we use a canvas-based composite to preserve identity
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+
+          const personImg = new Image();
+          const clothImg = new Image();
+
+          personImg.onload = () => {
+            canvas.width = personImg.width;
+            canvas.height = personImg.height;
+            
+            // Draw person
+            ctx.drawImage(personImg, 0, 0);
+            
+            clothImg.onload = () => {
+              // Basic cloth mapping logic:
+              // In a real 'non-AI' model, we'd use pose detection to align the shirt.
+              // For this immediate fix, we'll perform a clean overlay that preserves the person.
+              // We'll scale the cloth to fit the typical torso area.
+              const clothWidth = canvas.width * 0.5;
+              const clothHeight = (clothImg.height / clothImg.width) * clothWidth;
+              const x = (canvas.width - clothWidth) / 2;
+              const y = canvas.height * 0.25;
+
+              ctx.drawImage(clothImg, x, y, clothWidth, clothHeight);
+              
+              const resultImage = canvas.toDataURL('image/png');
+              setVtoResultImage(resultImage);
+              setShowResultDialog(true);
+              toast({
+                title: "Success",
+                description: "Clothing mapped successfully!",
+              });
+            };
+            clothImg.src = images[0];
+          };
+          personImg.src = personImage;
         } else {
           toast({
-            title: "AI Model Processing",
-            description: data.message || "Model is warming up. Please try again in 1-2 minutes.",
-            variant: "default",
+            title: "Error",
+            description: data.message || "Failed to process image.",
+            variant: "destructive",
           });
         }
       } catch (error) {
         toast({
           title: "Error",
-          description: "Failed to process image try-on. Please check your internet connection and try again.",
+          description: "Failed to process image try-on.",
           variant: "destructive",
         });
       } finally {
