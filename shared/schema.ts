@@ -21,6 +21,8 @@ export const insertProductSchema = createInsertSchema(products);
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 
+export * from "./models/chat";
+
 // Types for the Virtual Try-On Configuration
 export const tshirtConfigSchema = z.object({
   images: z.object({

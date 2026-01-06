@@ -3,6 +3,8 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { setupVTOApi } from "./vto-api";
+import { registerChatRoutes } from "./replit_integrations/chat";
+import { registerImageRoutes } from "./replit_integrations/image";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -10,6 +12,8 @@ export async function registerRoutes(
 ): Promise<Server> {
   
   setupVTOApi(app);
+  registerChatRoutes(app);
+  registerImageRoutes(app);
 
   app.get(api.products.list.path, async (req, res) => {
     const products = await storage.getProducts();
