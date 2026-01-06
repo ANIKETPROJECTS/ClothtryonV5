@@ -6,11 +6,14 @@ export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description").notNull(),
+  detailedDescription: text("detailedDescription"),
   price: integer("price").notNull(), // stored in cents
   sku: text("sku").notNull().unique(),
   // Stores URLs for different views: { front: string, back: string, left: string, right: string }
   images: jsonb("images").notNull(), 
   features: text("features").array(),
+  sizes: text("sizes").array(),
+  similarProducts: integer("similar_products").array(),
 });
 
 export const insertProductSchema = createInsertSchema(products);

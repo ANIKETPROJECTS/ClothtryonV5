@@ -12,26 +12,21 @@ export function setupVTOApi(app: Express) {
         return res.status(400).json({ message: "Missing images" });
       }
 
-      const hfToken = process.env.HF_TOKEN;
+      const hfToken = process.env.HF_API_TOKEN;
       if (!hfToken) {
-        return res.status(500).json({ message: "Hugging Face API token not configured" });
+        return res.status(500).json({ message: "Hugging Face API token not configured. Please add HF_API_TOKEN to secrets." });
       }
 
       // 1. Convert base64 to Blob for Hugging Face API
       const personBase64 = personImage.split(",")[1];
       const clothBase64 = clothingImage.split(",")[1];
 
-      // Note: In a production environment, we'd use a dedicated client
-      // For now, we'll interface with a popular VTO model on Hugging Face
-      // Model: Nymbo/Virtual-Try-On (highly rated for garment preservation)
-      
       try {
-        log("Sending images to Hugging Face VTO model...");
+        log("Sending images to Hugging Face IDM-VTON model...");
         
-        // This is a simplified interface to a Hugging Face Space/Model
-        // For production, we'd use the @huggingface/inference library
+        // Using IDM-VTON via Hugging Face Inference API
         const response = await fetch(
-          "https://api-inference.huggingface.co/models/Nymbo/Virtual-Try-On",
+          "https://api-inference.huggingface.co/models/yisol/IDM-VTON",
           {
             headers: {
               Authorization: `Bearer ${hfToken}`,
@@ -40,8 +35,8 @@ export function setupVTOApi(app: Express) {
             method: "POST",
             body: JSON.stringify({
               inputs: {
-                background: personBase64,
-                garment: clothBase64,
+                person_image: personBase64,
+                garment_image: clothBase64,
               }
             }),
           }
