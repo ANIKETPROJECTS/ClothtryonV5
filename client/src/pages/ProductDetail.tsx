@@ -89,6 +89,30 @@ export default function ProductDetail() {
             ctx.drawImage(personImg, 0, 0);
             
             clothImg.onload = () => {
+              // Create a temporary canvas to remove white background
+              const tempCanvas = document.createElement('canvas');
+              const tempCtx = tempCanvas.getContext('2d');
+              if (!tempCtx) return;
+
+              tempCanvas.width = clothImg.width;
+              tempCanvas.height = clothImg.height;
+              tempCtx.drawImage(clothImg, 0, 0);
+
+              const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+              const data = imageData.data;
+
+              // Simple white removal (threshold-based)
+              for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                // If pixel is very close to white, make it transparent
+                if (r > 240 && g > 240 && b > 240) {
+                  data[i + 3] = 0;
+                }
+              }
+              tempCtx.putImageData(imageData, 0, 0);
+
               // Non-AI mapping logic using TSHIRT_CONFIG calibration
               const scaleFactor = TSHIRT_CONFIG.calibration?.scaleFactor || 0.5;
               const verticalOffset = TSHIRT_CONFIG.calibration?.verticalOffset || 0.25;
@@ -98,7 +122,8 @@ export default function ProductDetail() {
               const x = (canvas.width - clothWidth) / 2;
               const y = canvas.height * verticalOffset;
 
-              ctx.drawImage(clothImg, x, y, clothWidth, clothHeight);
+              // Draw processed cloth
+              ctx.drawImage(tempCanvas, x, y, clothWidth, clothHeight);
               
               const resultImage = canvas.toDataURL('image/png');
               setVtoResultImage(resultImage);
