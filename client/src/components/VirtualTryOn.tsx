@@ -1,0 +1,484 @@
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import Webcam from "react-webcam";
+import * as tf from "@tensorflow/tfjs-core";
+import "@tensorflow/tfjs-backend-webgl";
+import * as poseDetection from "@tensorflow-models/pose-detection";
+import { motion, AnimatePresence } from "framer-motion";
+import { Camera, X, RefreshCw, AlertCircle, ChevronUp, ChevronDown } from "lucide-react";
+import { TSHIRT_CONFIG } from "@/lib/tshirt-config";
+
+interface VirtualTryOnProps {
+  onClose: () => void;
+  productImage: string;
+}
+
+type Pose = poseDetection.Pose;
+type Keypoint = poseDetection.Keypoint;
+
+export function VirtualTryOn({ onClose }: VirtualTryOnProps) {
+  const webcamRef = useRef<Webcam>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [model, setModel] = useState<poseDetection.PoseDetector | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState({ fps: 0, confidence: 0 });
+  const [currentView, setCurrentView] = useState<'front' | 'back' | 'left' | 'right'>('front');
+  
+  const shirtImages = useRef<{ [key: string]: HTMLImageElement }>({});
+
+  useEffect(() => {
+    const loadModel = async () => {
+      try {
+        await tf.ready();
+        const detectorConfig: poseDetection.MoveNetModelConfig = {
+          modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+          enableSmoothing: true
+        };
+        const detector = await poseDetection.createDetector(
+          poseDetection.SupportedModels.MoveNet,
+          detectorConfig
+        );
+        setModel(detector);
+        setIsLoading(false);
+      } catch (err) {
+        console.error("Failed to load pose model:", err);
+        setError("Failed to initialize VTO engine. Please try again.");
+        setIsLoading(false);
+      }
+    };
+
+    const preloadImages = () => {
+      Object.entries(TSHIRT_CONFIG.images).forEach(([key, src]) => {
+        const img = new Image();
+        img.src = src;
+        shirtImages.current[key] = img;
+      });
+    };
+
+    loadModel();
+    preloadImages();
+  }, []);
+
+  const [sizeScale, setSizeScale] = useState(1);
+  const [verticalOffset, setVerticalOffset] = useState(0);
+  const gestureCooldown = useRef(false);
+  const lastPose = useRef<Pose | null>(null);
+  const activeGestures = useRef<{
+    leftWrist: boolean;
+    rightWrist: boolean;
+    bothWrists: boolean;
+  }>({
+    leftWrist: false,
+    rightWrist: false,
+    bothWrists: false,
+  });
+
+  const detect = useCallback(async () => {
+    if (
+      webcamRef.current?.video?.readyState === 4 &&
+      model &&
+      canvasRef.current
+    ) {
+      const video = webcamRef.current.video;
+      const videoWidth = video.videoWidth;
+      const videoHeight = video.videoHeight;
+
+      if (canvasRef.current.width !== videoWidth || canvasRef.current.height !== videoHeight) {
+        canvasRef.current.width = videoWidth;
+        canvasRef.current.height = videoHeight;
+      }
+
+      const start = performance.now();
+      const poses = await model.estimatePoses(video, { flipHorizontal: false });
+      const end = performance.now();
+      const fps = 1000 / (end - start);
+
+      if (poses && poses.length > 0) {
+        lastPose.current = poses[0];
+        setMetrics({ 
+          fps: Math.round(fps), 
+          confidence: Math.round((lastPose.current.score || 0) * 100) 
+        });
+        drawCanvas(lastPose.current, videoWidth, videoHeight, canvasRef.current);
+      } else {
+        const ctx = canvasRef.current.getContext("2d");
+        if (ctx) ctx.clearRect(0, 0, videoWidth, videoHeight);
+        setMetrics(prev => ({ ...prev, fps: Math.round(fps), confidence: 0 }));
+      }
+    }
+  }, [model, currentView, sizeScale, verticalOffset]);
+
+  useEffect(() => {
+    // Force redraw when scale or offset changes even if no new pose estimate is being made
+    if (lastPose.current && canvasRef.current && webcamRef.current?.video) {
+      drawCanvas(lastPose.current, canvasRef.current.width, canvasRef.current.height, canvasRef.current);
+    }
+  }, [sizeScale, verticalOffset]);
+
+  useEffect(() => {
+    let animationFrameId: number;
+    let isRunning = true;
+
+    const loop = async () => {
+      if (!isRunning) return;
+      await detect();
+      animationFrameId = requestAnimationFrame(loop);
+    };
+
+    if (!isLoading && model) {
+      loop();
+    }
+
+    return () => {
+      isRunning = false;
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [detect, isLoading, model]);
+
+  const drawCanvas = (pose: Pose, width: number, height: number, canvas: HTMLCanvasElement | null) => {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, width, height);
+
+    const keypoints = pose.keypoints;
+    const leftShoulder = keypoints.find((k) => k.name === "left_shoulder");
+    const rightShoulder = keypoints.find((k) => k.name === "right_shoulder");
+    const leftHip = keypoints.find((k) => k.name === "left_hip");
+    const rightHip = keypoints.find((k) => k.name === "right_hip");
+    const nose = keypoints.find((k) => k.name === "nose");
+    const leftEye = keypoints.find((k) => k.name === "left_eye");
+    const rightEye = keypoints.find((k) => k.name === "right_eye");
+    const leftEar = keypoints.find((k) => k.name === "left_ear");
+    const rightEar = keypoints.find((k) => k.name === "right_ear");
+    const leftElbow = keypoints.find(k => k.name === "left_elbow");
+    const leftWrist = keypoints.find(k => k.name === "left_wrist");
+    const rightElbow = keypoints.find(k => k.name === "right_elbow");
+    const rightWrist = keypoints.find(k => k.name === "right_wrist");
+
+    const minConfidence = 0.35;
+    if (
+      leftShoulder && leftShoulder.score! > minConfidence &&
+      rightShoulder && rightShoulder.score! > minConfidence &&
+      leftHip && leftHip.score! > minConfidence &&
+      rightHip && rightHip.score! > minConfidence
+    ) {
+      // Gesture Detection: Left hand wide only -> Up, Right hand wide only -> Down
+      const shoulderWidth = Math.abs(rightShoulder.x - leftShoulder.x);
+      const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
+
+      let isDoingOffsetGesture = false;
+      if (leftWrist && rightWrist && leftWrist.score! > 0.5 && rightWrist.score! > 0.5) {
+        const leftWristWide = Math.abs(leftWrist.x - shoulderCenterX) > shoulderWidth * 1.5;
+        const rightWristWide = Math.abs(rightWrist.x - shoulderCenterX) > shoulderWidth * 1.5;
+
+        // Left hand wide only -> Up
+        if (leftWristWide && !rightWristWide) {
+          isDoingOffsetGesture = true;
+          if (!activeGestures.current.bothWrists) {
+            setVerticalOffset(prev => {
+              const next = Math.max(prev - 0.05, -0.5);
+              console.log(`Gesture Triggered: Left wrist wide - Shifting T-shirt up. New Offset: ${next.toFixed(2)}`);
+              return next;
+            });
+            activeGestures.current.bothWrists = true;
+          }
+        } 
+        // Right hand wide only -> Down
+        else if (rightWristWide && !leftWristWide) {
+          isDoingOffsetGesture = true;
+          if (!activeGestures.current.bothWrists) {
+            setVerticalOffset(prev => {
+              const next = Math.min(prev + 0.05, 0.5);
+              console.log(`Gesture Triggered: Right wrist wide - Shifting T-shirt down. New Offset: ${next.toFixed(2)}`);
+              return next;
+            });
+            activeGestures.current.bothWrists = true;
+          }
+        } 
+        // Reset when hands are back in
+        else if (!leftWristWide && !rightWristWide) {
+          activeGestures.current.bothWrists = false;
+        }
+      } else {
+        activeGestures.current.bothWrists = false;
+      }
+
+      const currentLeftWristRaised = leftWrist && leftWrist.score! > 0.5 && leftWrist.y < leftShoulder.y;
+      const currentRightWristRaised = rightWrist && rightWrist.score! > 0.5 && rightWrist.y < rightShoulder.y;
+
+      // Right wrist raised (only if not doing offset gesture)
+      if (currentRightWristRaised && !currentLeftWristRaised && !isDoingOffsetGesture) {
+        if (!activeGestures.current.rightWrist) {
+          setSizeScale(prev => {
+            const next = Math.min(prev + 0.1, 3.0);
+            console.log(`Gesture Triggered: Right wrist raised - Increasing T-shirt size. New Scale: ${next.toFixed(2)}`);
+            return next;
+          });
+          activeGestures.current.rightWrist = true;
+        }
+      } else {
+        activeGestures.current.rightWrist = false;
+      }
+
+      // Left wrist raised (only if not doing offset gesture)
+      if (currentLeftWristRaised && !currentRightWristRaised && !isDoingOffsetGesture) {
+        if (!activeGestures.current.leftWrist) {
+          setSizeScale(prev => {
+            const next = Math.max(prev - 0.1, 0.4);
+            console.log(`Gesture Triggered: Left wrist raised - Decreasing T-shirt size. New Scale: ${next.toFixed(2)}`);
+            return next;
+          });
+          activeGestures.current.leftWrist = true;
+        }
+      } else {
+        activeGestures.current.leftWrist = false;
+      }
+
+      // Orientation Detection logic
+      const hasNose = nose && nose.score! > 0.3;
+      const facePointsCount = [hasNose, leftEye?.score! > 0.3, rightEye?.score! > 0.3].filter(Boolean).length;
+      const earPointsCount = [leftEar?.score! > 0.3, rightEar?.score! > 0.3].filter(Boolean).length;
+
+      let detectedView: 'front' | 'back' | 'left' | 'right' = 'front';
+      if (facePointsCount >= 1 || earPointsCount >= 1) { 
+        const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
+        const shoulderWidth = Math.abs(rightShoulder.x - leftShoulder.x);
+        
+        if (hasNose) {
+          const noseOffset = (nose.x - shoulderCenterX) / (shoulderWidth / 2);
+          // Swapped 'left' and 'right' logic to fix the mirrored image issue
+          if (noseOffset > 0.6) detectedView = 'left';
+          else if (noseOffset < -0.6) detectedView = 'right';
+          else detectedView = 'front';
+        } else if (facePointsCount >= 1) {
+          detectedView = 'front';
+        } else if (earPointsCount === 1) {
+          // Swapped 'left' and 'right' logic here too
+          detectedView = leftEar?.score! > rightEar?.score! ? 'right' : 'left';
+        } else {
+          detectedView = 'front';
+        }
+      } else {
+        detectedView = 'back';
+      }
+
+      if (detectedView !== currentView) {
+        setCurrentView(detectedView);
+      }
+
+      // Draw tracking lines for body only
+      drawTrackingOverlay(ctx, keypoints);
+
+      // Select Image
+      const shirtImg = shirtImages.current[currentView];
+      if (shirtImg) {
+        const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
+        const shoulderCenterY = (leftShoulder.y + rightShoulder.y) / 2;
+        const hipCenterX = (leftHip.x + rightHip.x) / 2;
+        const hipCenterY = (leftHip.y + rightHip.y) / 2;
+
+        // Calculate a stable shoulder width to prevent shrinking in profile/side views
+        const shoulderWidth = Math.abs(rightShoulder.x - leftShoulder.x);
+        const torsoHeight = Math.abs(hipCenterY - shoulderCenterY);
+
+        // Maintain a minimum width based on the video width to prevent "shrinking" when turning
+        const minShoulderWidth = width * 0.4;
+        const stableWidth = Math.max(shoulderWidth, minShoulderWidth);
+
+        // Use a uniform scale to prevent stretching and keep the T-shirt "normal"
+        // Reducing scale factor slightly to make the T-shirt just a little smaller
+        const scale = ((stableWidth * 1.35) / shirtImg.width) * sizeScale;
+
+        // Set angle to 0 for a fixed, straight T-shirt
+        const angle = 0;
+
+        ctx.save();
+        // Anchor to shoulder center
+        ctx.translate(shoulderCenterX, shoulderCenterY);
+        ctx.rotate(angle);
+        
+        ctx.scale(scale, scale);
+
+        // Position adjustment: Shift T-shirt upwards
+        // Moving from -0.18 to -0.15 to lower it slightly as requested
+        ctx.drawImage(
+          shirtImg, 
+          -shirtImg.width / 2, 
+          (-shirtImg.height * 0.15) + (shirtImg.height * verticalOffset)
+        );
+
+        ctx.restore();
+
+        // Render arms ahead of the image if in side view
+        if (currentView === 'left' || currentView === 'right') {
+          const drawArmSegment = (p1?: Keypoint, p2?: Keypoint) => {
+            if (p1 && p1.score! > minConfidence && p2 && p2.score! > minConfidence) {
+              // We only want elbow to wrist/ahead
+              // But to look natural we draw the whole segment
+              ctx.beginPath();
+              ctx.strokeStyle = "#00FF00";
+              ctx.lineWidth = 4;
+              ctx.moveTo(p1.x, p1.y);
+              ctx.lineTo(p2.x, p2.y);
+              ctx.stroke();
+            }
+          };
+
+          const leftElbow = keypoints.find(k => k.name === "left_elbow");
+          const leftWrist = keypoints.find(k => k.name === "left_wrist");
+          const rightElbow = keypoints.find(k => k.name === "right_elbow");
+          const rightWrist = keypoints.find(k => k.name === "right_wrist");
+
+          if (currentView === 'left') {
+            // In left view (facing left), the right arm is usually more visible/ahead
+            drawArmSegment(rightElbow, rightWrist);
+          } else {
+            // In right view, the left arm is ahead
+            drawArmSegment(leftElbow, leftWrist);
+          }
+        }
+      }
+    }
+  };
+
+  const drawTrackingOverlay = (ctx: CanvasRenderingContext2D, keypoints: Keypoint[]) => {
+    const points = ["left_shoulder", "right_shoulder", "left_hip", "right_hip", "left_elbow", "right_elbow", "left_wrist", "right_wrist"];
+    const found = points.map(name => keypoints.find(k => k.name === name));
+    
+    // Bright Green (#00FF00) for maximum visibility as requested
+    ctx.strokeStyle = "#00FF00";
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+
+    const [ls, rs, lh, rh, le, re, lw, rw] = found;
+
+    const drawLine = (p1?: Keypoint, p2?: Keypoint) => {
+      if (p1 && p1.score! > 0.3 && p2 && p2.score! > 0.3) {
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+    };
+
+    drawLine(ls, rs); // shoulders
+    drawLine(ls, lh); // left torso
+    drawLine(rs, rh); // right torso
+    drawLine(lh, rh); // hips
+    drawLine(ls, le); drawLine(le, lw); // left arm
+    drawLine(rs, re); drawLine(re, rw); // right arm
+  };
+
+  const capturePhoto = () => {
+    if (canvasRef.current && webcamRef.current?.video) {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvasRef.current.width;
+      tempCanvas.height = canvasRef.current.height;
+      const ctx = tempCanvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(webcamRef.current.video, 0, 0);
+        ctx.drawImage(canvasRef.current, 0, 0);
+        const link = document.createElement('a');
+        link.download = `onyu-vto-${Date.now()}.png`;
+        link.href = tempCanvas.toDataURL();
+        link.click();
+      }
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center">
+      <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-20 bg-gradient-to-b from-black/80 to-transparent">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+          <span className="text-white font-mono text-xs uppercase tracking-widest">Live Feed</span>
+        </div>
+        <button onClick={onClose} className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full backdrop-blur-md transition-all">
+          <X className="w-6 h-6" />
+        </button>
+      </div>
+
+      <div className="relative w-full h-full flex items-center justify-center bg-neutral-900 overflow-hidden">
+        {isLoading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-50 bg-neutral-900">
+            <RefreshCw className="w-10 h-10 animate-spin text-primary mb-4" />
+            <h3 className="text-xl font-display font-bold">Initializing VTO Engine</h3>
+          </div>
+        )}
+
+        {error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-50 bg-neutral-900">
+            <AlertCircle className="w-12 h-12 text-destructive mb-4" />
+            <h3 className="text-xl font-bold">Error</h3>
+            <p className="text-neutral-400 mt-2">{error}</p>
+            <button onClick={onClose} className="mt-6 px-6 py-2 bg-white text-black font-bold rounded-full">Close</button>
+          </div>
+        )}
+
+        <Webcam 
+          ref={webcamRef} 
+          audio={false} 
+          className="absolute inset-0 w-full h-full object-cover" 
+          mirrored={true}
+          videoConstraints={{
+            facingMode: "user",
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }} 
+        />
+        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover pointer-events-none transform -scale-x-100" />
+
+        <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center gap-6 z-20 px-6">
+          <div className="flex flex-col gap-2 md:hidden">
+            <button 
+              onClick={() => setSizeScale(prev => Math.min(prev + 0.1, 3.0))}
+              className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center font-bold"
+              title="Increase Size"
+            >
+              +
+            </button>
+            <button 
+              onClick={() => setSizeScale(prev => Math.max(prev - 0.1, 0.4))}
+              className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center font-bold"
+              title="Decrease Size"
+            >
+              -
+            </button>
+          </div>
+          
+          <button onClick={capturePhoto} className="group relative flex items-center justify-center w-20 h-20 rounded-full bg-white text-black shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-110 transition-transform flex-shrink-0">
+            <Camera className="w-8 h-8" />
+          </button>
+
+          <div className="flex flex-col gap-2 md:hidden">
+            <button 
+              onClick={() => setVerticalOffset(prev => Math.max(prev - 0.05, -0.5))}
+              className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center"
+              title="Move Up"
+            >
+              <ChevronUp className="w-6 h-6" />
+            </button>
+            <button 
+              onClick={() => setVerticalOffset(prev => Math.min(prev + 0.05, 0.5))}
+              className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center"
+              title="Move Down"
+            >
+              <ChevronDown className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+
+        <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
+          <div className="px-4 py-2 bg-black/50 backdrop-blur-md rounded-full border border-white/10 text-[10px] text-white/50 uppercase tracking-[0.2em]">
+            Mode: <span className="text-primary font-bold">{currentView}</span>
+          </div>
+          <p className="text-[10px] text-white/30 uppercase text-center max-w-[200px]">
+            Raise left hand to shrink, right hand to enlarge
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
