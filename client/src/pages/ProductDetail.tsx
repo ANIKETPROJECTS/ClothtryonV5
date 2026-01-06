@@ -89,14 +89,14 @@ export default function ProductDetail() {
             ctx.drawImage(personImg, 0, 0);
             
             clothImg.onload = () => {
-              // Basic cloth mapping logic:
-              // In a real 'non-AI' model, we'd use pose detection to align the shirt.
-              // For this immediate fix, we'll perform a clean overlay that preserves the person.
-              // We'll scale the cloth to fit the typical torso area.
-              const clothWidth = canvas.width * 0.5;
+              // Non-AI mapping logic using TSHIRT_CONFIG calibration
+              const scaleFactor = TSHIRT_CONFIG.calibration?.scaleFactor || 0.5;
+              const verticalOffset = TSHIRT_CONFIG.calibration?.verticalOffset || 0.25;
+
+              const clothWidth = canvas.width * scaleFactor;
               const clothHeight = (clothImg.height / clothImg.width) * clothWidth;
               const x = (canvas.width - clothWidth) / 2;
-              const y = canvas.height * 0.25;
+              const y = canvas.height * verticalOffset;
 
               ctx.drawImage(clothImg, x, y, clothWidth, clothHeight);
               
