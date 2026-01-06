@@ -45,8 +45,8 @@ async function seedDatabase() {
       {
         name: "ONYU Signature Tee",
         description: "The cornerstone of the ONYU collection. Crafted from 240GSM premium heavyweight cotton, this tee offers a structured yet breathable fit. Features dropped shoulders and a reinforced collar for longevity.",
-        detailedDescription: "Designed for ultimate comfort and durability, our signature tee is made from sustainably sourced 240gsm organic cotton. The silicon wash finish provides a luxuriously soft hand-feel, while the reinforced double-stitched seams ensure it maintains its shape through countless wears and washes.",
-        price: 2499, // ₹2,499
+        detailedDescription: "Designed for ultimate comfort and durability, our signature tee is made from sustainably sourced 240gsm organic cotton. The silicon wash finish provides a luxuriously soft hand-feel, while the reinforced double-stitched seams ensure it maintains its shape through countless wears and washes. Features a contemporary oversized silhouette with dropped shoulders and a thick ribbed collar.",
+        price: 2499,
         sku: "ONYU-TEE-001",
         images: {
           front: "/src/assets/generated_images/signature_onyu_black_t-shirt_front_view_(no_background).png",
@@ -54,20 +54,15 @@ async function seedDatabase() {
           left: "/src/assets/generated_images/signature_onyu_black_t-shirt_left_side_view_(no_background).png",
           right: "/src/assets/generated_images/signature_onyu_black_t-shirt_right_side_view_(no_background).png"
         },
-        features: [
-          "240GSM Heavyweight Cotton",
-          "Oversized Boxy Fit",
-          "Reinforced Crew Neck",
-          "Eco-friendly Silicon Wash"
-        ],
+        features: ["240GSM Heavyweight Cotton", "Oversized Boxy Fit", "Reinforced Crew Neck", "Eco-friendly Silicon Wash"],
         sizes: ["XS", "S", "M", "L", "XL", "XXL"],
         similarProducts: [2, 3]
       },
       {
         name: "ONYU Stealth Hoodie",
-        description: "Minimalist design meets extreme comfort. Our Stealth Hoodie is made from premium French Terry with a unique water-resistant finish. Perfect for transitional weather.",
+        description: "Minimalist design meets extreme comfort. Our Stealth Hoodie is made from premium French Terry with a unique water-resistant finish.",
         detailedDescription: "The Stealth Hoodie represents our commitment to performance-led design. Built with 400GSM French Terry fabric, it features a unique water-resistant finish that repels light rain while remaining completely breathable. Includes hidden zippered tech pockets and a double-lined structured hood.",
-        price: 4999, // ₹4,999
+        price: 4999,
         sku: "ONYU-HD-002",
         images: {
           front: "/src/assets/generated_images/premium_black_stealth_hoodie_product_shot.png",
@@ -75,20 +70,15 @@ async function seedDatabase() {
           left: "/src/assets/generated_images/premium_black_hoodie_left_side_view_(no_background).png",
           right: "/src/assets/generated_images/premium_black_hoodie_right_side_view_(no_background).png"
         },
-        features: [
-          "400GSM French Terry",
-          "Water-resistant Coating",
-          "Hidden Tech Pockets",
-          "Double-lined Hood"
-        ],
+        features: ["400GSM French Terry", "Water-resistant Coating", "Hidden Tech Pockets", "Double-lined Hood"],
         sizes: ["S", "M", "L", "XL"],
         similarProducts: [1, 3]
       },
       {
         name: "ONYU Cargo Joggers",
-        description: "Utility refined. These joggers feature a technical nylon-stretch blend with six functional pockets, designed for the urban explorer who refuses to compromise on style.",
+        description: "Utility refined. These joggers feature a technical nylon-stretch blend with six functional pockets.",
         detailedDescription: "Engineered for movement, the ONYU Cargo Joggers blend technical performance with streetwear aesthetics. The 4-way stretch technical nylon fabric provides unrestricted mobility, while the six-pocket configuration offers ample storage for essentials. Features articulated knees and adjustable toggles at the hem.",
-        price: 3999, // ₹3,999
+        price: 3999,
         sku: "ONYU-JG-003",
         images: {
           front: "/src/assets/generated_images/premium_technical_cargo_joggers_product_shot.png",
@@ -96,12 +86,7 @@ async function seedDatabase() {
           left: "/src/assets/generated_images/premium_black_cargo_joggers_left_side_view_(no_background).png",
           right: "/src/assets/generated_images/premium_black_cargo_joggers_right_side_view_(no_background).png"
         },
-        features: [
-          "4-Way Stretch Nylon",
-          "Articulated Knee Design",
-          "Snap-closure Cargo Pockets",
-          "Adjustable Tapered Fit"
-        ],
+        features: ["4-Way Stretch Nylon", "Articulated Knee Design", "Snap-closure Cargo Pockets", "Adjustable Tapered Fit"],
         sizes: ["S", "M", "L", "XL"],
         similarProducts: [1, 2]
       }

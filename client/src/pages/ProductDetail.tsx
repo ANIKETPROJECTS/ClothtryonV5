@@ -263,7 +263,7 @@ export default function ProductDetail() {
           <div className="mt-24 border-t border-white/10 pt-16">
             <h2 className="text-2xl font-bold text-white mb-8 uppercase tracking-widest">Complete The Look</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {similarProducts.map((p) => (
+              {similarProducts.map((p: any) => (
                 <Link key={p.id} href={`/product/${p.id}`}>
                   <div className="group cursor-pointer">
                     <div className="aspect-[3/4] bg-white rounded-lg overflow-hidden mb-4 relative shadow-lg">
