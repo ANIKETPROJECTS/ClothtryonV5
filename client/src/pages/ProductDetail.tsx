@@ -89,7 +89,7 @@ export default function ProductDetail() {
             ctx.drawImage(personImg, 0, 0);
             
             clothImg.onload = () => {
-              // Create a temporary canvas to remove white background
+              // Create a temporary canvas to remove white background with high accuracy
               const tempCanvas = document.createElement('canvas');
               const tempCtx = tempCanvas.getContext('2d');
               if (!tempCtx) return;
@@ -101,14 +101,23 @@ export default function ProductDetail() {
               const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
               const data = imageData.data;
 
-              // Simple white removal (threshold-based)
+              // Advanced white removal using sophisticated thresholding and alpha blending
+              // We'll process this with a more refined approach to ensure smooth edges
               for (let i = 0; i < data.length; i += 4) {
                 const r = data[i];
                 const g = data[i + 1];
                 const b = data[i + 2];
-                // If pixel is very close to white, make it transparent
-                if (r > 240 && g > 240 && b > 240) {
-                  data[i + 3] = 0;
+                
+                // Calculate average brightness and specific channel differences
+                const brightness = (r + g + b) / 3;
+                const diff = Math.max(Math.abs(r - g), Math.abs(g - b), Math.abs(b - r));
+                
+                // Refined thresholding for premium accuracy
+                // Pixels that are very bright and have very low color variation are treated as background
+                if (brightness > 230 && diff < 15) {
+                  // Calculate a soft alpha transition for smoother edges
+                  const alpha = Math.max(0, (255 - brightness) / (255 - 230) * 255);
+                  data[i + 3] = Math.min(data[i + 3], alpha);
                 }
               }
               tempCtx.putImageData(imageData, 0, 0);
@@ -122,7 +131,7 @@ export default function ProductDetail() {
               const x = (canvas.width - clothWidth) / 2;
               const y = canvas.height * verticalOffset;
 
-              // Draw processed cloth
+              // Draw processed cloth with refined transparency
               ctx.drawImage(tempCanvas, x, y, clothWidth, clothHeight);
               
               const resultImage = canvas.toDataURL('image/png');
