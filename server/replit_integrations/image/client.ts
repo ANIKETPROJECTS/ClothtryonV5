@@ -10,13 +10,26 @@ export const ai = new GoogleGenAI({
 });
 
 /**
- * Generate an image and return as base64 data URL.
- * Uses gemini-2.5-flash-image model via Replit AI Integrations.
+ * Generate an image using multimodal input (text + images).
+ * Returns base64 data URL.
  */
-export async function generateImage(prompt: string): Promise<string> {
+export async function generateImageMultimodal(prompt: string, images: { data: string, mimeType: string }[]): Promise<string> {
+  const imageParts = images.map(img => ({
+    inlineData: {
+      data: img.data.split(',')[1] || img.data,
+      mimeType: img.mimeType
+    }
+  }));
+
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-image",
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    contents: [{ 
+      role: "user", 
+      parts: [
+        { text: prompt },
+        ...imageParts
+      ] 
+    }],
     config: {
       responseModalities: [Modality.TEXT, Modality.IMAGE],
     },
@@ -33,5 +46,13 @@ export async function generateImage(prompt: string): Promise<string> {
 
   const mimeType = imagePart.inlineData.mimeType || "image/png";
   return `data:${mimeType};base64,${imagePart.inlineData.data}`;
+}
+
+/**
+ * Generate an image and return as base64 data URL.
+ * Uses gemini-2.5-flash-image model via Replit AI Integrations.
+ */
+export async function generateImage(prompt: string): Promise<string> {
+  return generateImageMultimodal(prompt, []);
 }
 
