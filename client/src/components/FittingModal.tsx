@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { X, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Plus, Minus, Maximize2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -19,6 +19,16 @@ export function FittingModal({ isOpen, onClose, personImage, clothingImages }: F
   const [currentView, setCurrentView] = useState<keyof typeof clothingImages>("front");
   const [shirtPos, setShirtPos] = useState({ x: 0, y: 0, scale: 0.8 });
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const moveShirt = (dx: number, dy: number) => {
     setShirtPos(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
@@ -56,13 +66,17 @@ export function FittingModal({ isOpen, onClose, personImage, clothingImages }: F
   if (!isOpen) return null;
 
   const Interface = () => (
-    <div className="relative w-full h-full bg-neutral-900 overflow-hidden flex items-center justify-center">
+    <div className="relative w-full h-full bg-neutral-900 overflow-hidden flex items-center justify-center touch-none">
       <img src={personImage} alt="Person" className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
       
       <motion.div
         drag
         dragMomentum={false}
-        style={ { x: shirtPos.x, y: shirtPos.y, scale: shirtPos.scale } }
+        onDrag={(e, info) => {
+          setShirtPos(prev => ({ ...prev, x: prev.x + info.delta.x, y: prev.y + info.delta.y }));
+        }}
+        style={ { scale: shirtPos.scale } }
+        animate={ { x: shirtPos.x, y: shirtPos.y } }
         className="absolute cursor-move z-10 w-1/2 flex items-center justify-center"
       >
         <img 
@@ -73,6 +87,18 @@ export function FittingModal({ isOpen, onClose, personImage, clothingImages }: F
         />
       </motion.div>
 
+      {/* Pinch to zoom overlay for mobile */}
+      {isMobile && (
+        <div 
+          className="absolute inset-0 z-0" 
+          onWheel={(e) => {
+            if (e.ctrlKey) {
+              scaleShirt(e.deltaY > 0 ? -0.05 : 0.05);
+            }
+          }}
+        />
+      )}
+
       {/* View Selection Controls */}
       <div className="absolute top-4 left-4 flex gap-2 z-20">
         {(["front", "back", "left", "right"] as const).map(view => (
@@ -81,11 +107,7 @@ export function FittingModal({ isOpen, onClose, personImage, clothingImages }: F
             variant={currentView === view ? "default" : "secondary"}
             size="sm"
             className="capitalize text-[10px] h-7 px-3"
-            onClick={() => {
-              setCurrentView(view);
-              // Reset shirt position slightly for different views if needed, 
-              // but keeping it simple for now as requested.
-            }}
+            onClick={() => setCurrentView(view)}
           >
             {view}
           </Button>
@@ -97,23 +119,31 @@ export function FittingModal({ isOpen, onClose, personImage, clothingImages }: F
         <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => setIsFullscreen(!isFullscreen)}><Maximize2 className="h-4 w-4" /></Button>
       </div>
 
-      {/* Positioning Controls */}
-      <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end z-20 pointer-events-none">
-        <div className="flex flex-col gap-1 pointer-events-auto">
-          <div className="grid grid-cols-3 gap-1">
-            <div />
-            <Button size="icon" variant="secondary" className="h-7 w-7" onClick={() => moveShirt(0, -2)}><ChevronUp className="h-3.5 w-3.5" /></Button>
-            <div />
-            <Button size="icon" variant="secondary" className="h-7 w-7" onClick={() => moveShirt(-2, 0)}><ChevronLeft className="h-3.5 w-3.5" /></Button>
-            <Button size="icon" variant="secondary" className="h-7 w-7" onClick={() => moveShirt(0, 2)}><ChevronDown className="h-3.5 w-3.5" /></Button>
-            <Button size="icon" variant="secondary" className="h-7 w-7" onClick={() => moveShirt(2, 0)}><ChevronRight className="h-3.5 w-3.5" /></Button>
+      {/* Positioning Controls - Hidden on Mobile */}
+      {!isMobile && (
+        <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end z-20 pointer-events-none">
+          <div className="flex flex-col gap-1 pointer-events-auto">
+            <div className="grid grid-cols-3 gap-1">
+              <div />
+              <Button size="icon" variant="secondary" className="h-7 w-7" onClick={() => moveShirt(0, -2)}><ChevronUp className="h-3.5 w-3.5" /></Button>
+              <div />
+              <Button size="icon" variant="secondary" className="h-7 w-7" onClick={() => moveShirt(-2, 0)}><ChevronLeft className="h-3.5 w-3.5" /></Button>
+              <Button size="icon" variant="secondary" className="h-7 w-7" onClick={() => moveShirt(0, 2)}><ChevronDown className="h-3.5 w-3.5" /></Button>
+              <Button size="icon" variant="secondary" className="h-7 w-7" onClick={() => moveShirt(2, 0)}><ChevronRight className="h-3.5 w-3.5" /></Button>
+            </div>
+          </div>
+          <div className="flex gap-2 pointer-events-auto bg-black/20 p-1 rounded-lg backdrop-blur-sm">
+            <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => scaleShirt(0.02)}><Plus className="h-4 w-4" /></Button>
+            <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => scaleShirt(-0.02)}><Minus className="h-4 w-4" /></Button>
           </div>
         </div>
-        <div className="flex gap-2 pointer-events-auto bg-black/20 p-1 rounded-lg backdrop-blur-sm">
-          <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => scaleShirt(0.02)}><Plus className="h-4 w-4" /></Button>
-          <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => scaleShirt(-0.02)}><Minus className="h-4 w-4" /></Button>
+      )}
+
+      {isMobile && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 pointer-events-none text-white/60 text-[10px] uppercase tracking-widest whitespace-nowrap">
+          Drag to move • Pinch to zoom
         </div>
-      </div>
+      )}
     </div>
   );
 
@@ -140,9 +170,11 @@ export function FittingModal({ isOpen, onClose, personImage, clothingImages }: F
             <Interface />
           </div>
 
-          <div className="p-3 bg-neutral-950 border-t border-white/5 text-center text-white/30 text-[9px] md:text-[10px] uppercase tracking-[0.2em]">
-            Drag shirt to move • Arrows for precision • +/- keys to zoom
-          </div>
+          {!isMobile && (
+            <div className="p-3 bg-neutral-950 border-t border-white/5 text-center text-white/30 text-[9px] md:text-[10px] uppercase tracking-[0.2em]">
+              Drag shirt to move • Arrows for precision • +/- keys to zoom
+            </div>
+          )}
         </div>
       </motion.div>
     </AnimatePresence>
