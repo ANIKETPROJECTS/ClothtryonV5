@@ -57,14 +57,14 @@ export default function ImageVTO() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!clothingImage || !personImage) return;
-      const step = 5;
+      const step = 2;
       switch (e.key) {
         case "ArrowUp": moveShirt(0, -step); break;
         case "ArrowDown": moveShirt(0, step); break;
         case "ArrowLeft": moveShirt(-step, 0); break;
         case "ArrowRight": moveShirt(step, 0); break;
-        case "+": case "=": scaleShirt(0.05); break;
-        case "-": case "_": scaleShirt(-0.05); break;
+        case "+": case "=": scaleShirt(0.01); break;
+        case "-": case "_": scaleShirt(-0.01); break;
         case "Escape": setIsFullscreen(false); break;
       }
     };
@@ -113,8 +113,8 @@ export default function ImageVTO() {
             </div>
           </div>
           <div className="flex gap-2 pointer-events-auto">
-            <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => scaleShirt(0.1)}><Plus className="h-4 w-4" /></Button>
-            <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => scaleShirt(-0.1)}><Minus className="h-4 w-4" /></Button>
+            <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => scaleShirt(0.02)}><Plus className="h-4 w-4" /></Button>
+            <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => scaleShirt(-0.02)}><Minus className="h-4 w-4" /></Button>
           </div>
         </div>
       )}
