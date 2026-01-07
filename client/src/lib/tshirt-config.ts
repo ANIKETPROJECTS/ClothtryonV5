@@ -10,7 +10,7 @@ import rightImg from "@assets/right2_1767677434384.PNG";
 export const TSHIRT_CONFIG = {
   id: "luxury-tee-001",
   name: "Essential Luxury Tee",
-  price: 12000, // $120.00
+  price: 2499, // $24.99
   images: {
     front: frontImg,
     back: backImg,
@@ -18,7 +18,7 @@ export const TSHIRT_CONFIG = {
     right: rightImg,
   },
   calibration: {
-    scaleFactor: 0.6, // Adjusted for the new background-free image
-    verticalOffset: 0.15, // Move shirt to torso position
+    scaleFactor: 0.6,
+    verticalOffset: 0.15,
   }
 };

@@ -32,12 +32,12 @@ export default function ProductDetail() {
     id: 1,
     name: TSHIRT_CONFIG.name,
     price: TSHIRT_CONFIG.price,
-    description: "Crafted from heavy-weight 280gsm cotton jersey, this oversized tee features dropped shoulders and boxy fit.",
-    detailedDescription: "Designed for ultimate comfort and durability, our signature tee is made from sustainably sourced 280gsm organic cotton. The silicon wash finish provides a luxuriously soft hand-feel, while the reinforced double-stitched seams ensure it maintains its shape through countless wears and washes. Features a contemporary oversized silhouette with dropped shoulders and a thick ribbed collar.",
+    description: "The cornerstone of the ONYU collection. Crafted from 240GSM premium heavyweight cotton, this tee offers a structured yet breathable fit.",
+    detailedDescription: "Designed for ultimate comfort and durability, our signature tee is made from sustainably sourced 240gsm organic cotton. The silicon wash finish provides a luxuriously soft hand-feel, while the reinforced double-stitched seams ensure it maintains its shape through countless wears and washes.",
     images: TSHIRT_CONFIG.images,
-    sizes: ["XS", "S", "M", "L", "XL"],
-    features: ["100% Organic Cotton", "Heavyweight 280gsm", "Boxy Fit", "Silicon Wash Finish"],
-    similarProducts: []
+    sizes: ["XS", "S", "M", "L", "XL", "XXL"],
+    features: ["240GSM Heavyweight Cotton", "Oversized Boxy Fit", "Reinforced Crew Neck", "Eco-friendly Silicon Wash"],
+    similarProducts: [2, 3]
   };
 
   const images = [
