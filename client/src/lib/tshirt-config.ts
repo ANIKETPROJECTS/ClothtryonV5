@@ -4,7 +4,7 @@
 
 import frontImg from "@assets/Front2_1767677434382.PNG";
 import backImg from "@assets/Back2_1767677434383.PNG";
-import leftImg from "@assets/left2_1767677434384.PNG";
+import leftImg from "@assets/signature_onyu_black_t-shirt_left_side_view_(no_background)_1767676819311.png";
 import rightImg from "@assets/right2_1767677434384.PNG";
 
 export const TSHIRT_CONFIG = {
