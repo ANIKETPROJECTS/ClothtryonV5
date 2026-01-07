@@ -96,7 +96,7 @@ export default function ProductDetail() {
           isOpen={isFittingModalOpen}
           onClose={() => setIsFittingModalOpen(false)}
           personImage={uploadedPersonImage}
-          clothingImages={product.images}
+          clothingImages={TSHIRT_CONFIG.images}
         />
       )}
 

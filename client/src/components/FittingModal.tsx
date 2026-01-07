@@ -63,9 +63,14 @@ export function FittingModal({ isOpen, onClose, personImage, clothingImages }: F
         drag
         dragMomentum={false}
         style={ { x: shirtPos.x, y: shirtPos.y, scale: shirtPos.scale } }
-        className="absolute cursor-move z-10 w-1/2"
+        className="absolute cursor-move z-10 w-1/2 flex items-center justify-center"
       >
-        <img src={clothingImages[currentView]} alt="Shirt" className="w-full h-auto pointer-events-none" />
+        <img 
+          src={clothingImages[currentView]} 
+          alt="Shirt" 
+          className="w-full h-auto pointer-events-none mix-blend-multiply brightness-110 contrast-110" 
+          style={ { filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.1))' } }
+        />
       </motion.div>
 
       {/* View Selection Controls */}
@@ -76,7 +81,11 @@ export function FittingModal({ isOpen, onClose, personImage, clothingImages }: F
             variant={currentView === view ? "default" : "secondary"}
             size="sm"
             className="capitalize text-[10px] h-7 px-3"
-            onClick={() => setCurrentView(view)}
+            onClick={() => {
+              setCurrentView(view);
+              // Reset shirt position slightly for different views if needed, 
+              // but keeping it simple for now as requested.
+            }}
           >
             {view}
           </Button>
