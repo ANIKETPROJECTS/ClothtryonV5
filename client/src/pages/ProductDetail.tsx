@@ -34,12 +34,7 @@ export default function ProductDetail() {
     price: TSHIRT_CONFIG.price,
     description: "Crafted from heavy-weight 280gsm cotton jersey, this oversized tee features dropped shoulders and boxy fit.",
     detailedDescription: "Designed for ultimate comfort and durability, our signature tee is made from sustainably sourced 280gsm organic cotton. The silicon wash finish provides a luxuriously soft hand-feel, while the reinforced double-stitched seams ensure it maintains its shape through countless wears and washes. Features a contemporary oversized silhouette with dropped shoulders and a thick ribbed collar.",
-    images: {
-      front: TSHIRT_CONFIG.images.front,
-      back: TSHIRT_CONFIG.images.back,
-      left: TSHIRT_CONFIG.images.left,
-      right: TSHIRT_CONFIG.images.right,
-    },
+    images: TSHIRT_CONFIG.images,
     sizes: ["XS", "S", "M", "L", "XL"],
     features: ["100% Organic Cotton", "Heavyweight 280gsm", "Boxy Fit", "Silicon Wash Finish"],
     similarProducts: []
