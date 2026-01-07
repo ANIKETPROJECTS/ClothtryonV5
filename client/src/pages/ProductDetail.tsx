@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingBag, Star, Share2, Heart, Scan, Check, Upload, Loader2, Image as ImageIcon } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
 import { VirtualTryOn } from "@/components/VirtualTryOn";
+import { FittingModal } from "@/components/FittingModal";
 import { useProduct, useProducts } from "@/hooks/use-products";
 import { TSHIRT_CONFIG } from "@/lib/tshirt-config";
 import { formatPrice } from "@/lib/utils";
@@ -17,11 +18,11 @@ export default function ProductDetail() {
   const { id } = useParams();
   const { toast } = useToast();
   const [isVTOOpen, setIsVTOOpen] = useState(false);
+  const [isFittingModalOpen, setIsFittingModalOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState(0);
+  const [uploadedPersonImage, setUploadedPersonImage] = useState<string | null>(null);
   const [isImageVTOProcessing, setIsImageVTOProcessing] = useState(false);
-  const [vtoResultImage, setVtoResultImage] = useState<string | null>(null);
-  const [showResultDialog, setShowResultDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: fetchedProduct } = useProduct(Number(id));
@@ -31,7 +32,7 @@ export default function ProductDetail() {
     id: 1,
     name: TSHIRT_CONFIG.name,
     price: TSHIRT_CONFIG.price,
-    description: "Crafted from heavy-weight 280gsm cotton jersey, this oversized tee features dropped shoulders and a boxy fit.",
+    description: "Crafted from heavy-weight 280gsm cotton jersey, this oversized tee features dropped shoulders and boxy fit.",
     detailedDescription: "Designed for ultimate comfort and durability, our signature tee is made from sustainably sourced 280gsm organic cotton. The silicon wash finish provides a luxuriously soft hand-feel, while the reinforced double-stitched seams ensure it maintains its shape through countless wears and washes. Features a contemporary oversized silhouette with dropped shoulders and a thick ribbed collar.",
     images: {
       front: TSHIRT_CONFIG.images.front,
@@ -56,102 +57,18 @@ export default function ProductDetail() {
     (p.id !== product.id && allProducts.indexOf(p) < 3)
   ).slice(0, 3);
 
-  const handleImageTryOn = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageTryOn = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onloadend = async () => {
-      const personImage = reader.result as string;
-      setIsImageVTOProcessing(true);
-      
-      try {
-        const res = await apiRequest("POST", "/api/vto/image-try-on", {
-          personImage,
-          clothingImage: images[0]
-        });
-        const data = await res.json();
-        
-        if (data.status === "success") {
-          // Instead of AI generation, we use a canvas-based composite to preserve identity
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-
-          const personImg = new Image();
-          const clothImg = new Image();
-
-          personImg.onload = () => {
-            canvas.width = personImg.width;
-            canvas.height = personImg.height;
-            
-            // Draw person
-            ctx.drawImage(personImg, 0, 0);
-            
-            clothImg.onload = () => {
-              // Create a temporary canvas to remove white background
-              const tempCanvas = document.createElement('canvas');
-              const tempCtx = tempCanvas.getContext('2d');
-              if (!tempCtx) return;
-
-              tempCanvas.width = clothImg.width;
-              tempCanvas.height = clothImg.height;
-              tempCtx.drawImage(clothImg, 0, 0);
-
-              const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-              const data = imageData.data;
-
-              // Simple white removal (threshold-based)
-              for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                // If pixel is very close to white, make it transparent
-                if (r > 240 && g > 240 && b > 240) {
-                  data[i + 3] = 0;
-                }
-              }
-              tempCtx.putImageData(imageData, 0, 0);
-
-              // Non-AI mapping logic using TSHIRT_CONFIG calibration
-              const scaleFactor = TSHIRT_CONFIG.calibration?.scaleFactor || 0.5;
-              const verticalOffset = TSHIRT_CONFIG.calibration?.verticalOffset || 0.25;
-
-              const clothWidth = canvas.width * scaleFactor;
-              const clothHeight = (clothImg.height / clothImg.width) * clothWidth;
-              const x = (canvas.width - clothWidth) / 2;
-              const y = canvas.height * verticalOffset;
-
-              // Draw processed cloth
-              ctx.drawImage(tempCanvas, x, y, clothWidth, clothHeight);
-              
-              const resultImage = canvas.toDataURL('image/png');
-              setVtoResultImage(resultImage);
-              setShowResultDialog(true);
-              toast({
-                title: "Success",
-                description: "Clothing mapped successfully!",
-              });
-            };
-            clothImg.src = images[0];
-          };
-          personImg.src = personImage;
-        } else {
-          toast({
-            title: "Error",
-            description: data.message || "Failed to process image.",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to process image try-on.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsImageVTOProcessing(false);
-      }
+    reader.onloadend = () => {
+      setUploadedPersonImage(reader.result as string);
+      setIsFittingModalOpen(true);
+      toast({
+        title: "Photo Uploaded",
+        description: "You can now manually fit the T-shirt to your photo.",
+      });
     };
     reader.readAsDataURL(file);
   };
@@ -174,42 +91,14 @@ export default function ProductDetail() {
         )}
       </AnimatePresence>
 
-      <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
-        <DialogContent className="max-w-2xl bg-zinc-950 border-zinc-800">
-          <DialogHeader>
-            <DialogTitle className="text-white text-xl">Your Try-On Result</DialogTitle>
-          </DialogHeader>
-          <div className="aspect-[3/4] rounded-lg overflow-hidden bg-white mt-4">
-            {vtoResultImage && (
-              <img 
-                src={vtoResultImage} 
-                alt="Try-on result" 
-                className="w-full h-full object-cover"
-              />
-            )}
-          </div>
-          <div className="flex justify-end gap-3 mt-6">
-            <Button 
-              variant="outline" 
-              className="border-zinc-800 text-white hover:bg-zinc-900"
-              onClick={() => setShowResultDialog(false)}
-            >
-              Close
-            </Button>
-            <Button 
-              className="bg-primary text-black hover:bg-primary/90"
-              onClick={() => {
-                const link = document.createElement('a');
-                link.href = vtoResultImage || '';
-                link.download = `try-on-${product.name}.png`;
-                link.click();
-              }}
-            >
-              Download Image
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {uploadedPersonImage && (
+        <FittingModal
+          isOpen={isFittingModalOpen}
+          onClose={() => setIsFittingModalOpen(false)}
+          personImage={uploadedPersonImage}
+          clothingImages={product.images}
+        />
+      )}
 
       <div className="pt-24 pb-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 xl:gap-24">
@@ -221,7 +110,7 @@ export default function ProductDetail() {
               className="aspect-[3/4] bg-white rounded-lg overflow-hidden relative group shadow-2xl"
             >
               <img 
-                src={vtoResultImage || images[activeImage]} 
+                src={images[activeImage]} 
                 alt={product.name} 
                 className="w-full h-full object-cover"
               />
@@ -255,15 +144,6 @@ export default function ProductDetail() {
                   <span className="font-bold text-xs md:text-sm">Virtual Try-On</span>
                 </button>
               </div>
-
-              {vtoResultImage && (
-                <button 
-                  onClick={() => setVtoResultImage(null)}
-                  className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white px-3 py-1 rounded-full text-xs"
-                >
-                  Reset View
-                </button>
-              )}
             </motion.div>
 
             <div className="grid grid-cols-4 gap-2 md:gap-4">
@@ -272,10 +152,9 @@ export default function ProductDetail() {
                   key={idx}
                   onClick={() => {
                     setActiveImage(idx);
-                    setVtoResultImage(null);
                   }}
                   className={`aspect-square rounded-md overflow-hidden border-2 transition-all flex flex-col items-center bg-white ${
-                    activeImage === idx && !vtoResultImage ? "border-primary" : "border-transparent opacity-60 hover:opacity-100"
+                    activeImage === idx ? "border-primary" : "border-transparent opacity-60 hover:opacity-100"
                   }`}
                 >
                   <img src={img} alt={getViewLabel(idx)} className="w-full h-full object-cover" />
